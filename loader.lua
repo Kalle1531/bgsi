@@ -1,17 +1,42 @@
+-- loader.lua
+
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local screenGui = playerGui:WaitForChild("ScreenGui")
-local hud = screenGui:WaitForChild("HUD")
-local right = hud:WaitForChild("Right")
-local index = right:WaitForChild("Index")
-local indexButton = index:WaitForChild("Button")
-local indexFrame = playerGui:WaitForChild("Index")
-local NetworkRemote = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Framework"):WaitForChild("Network"):WaitForChild("Remote"):WaitForChild("RemoteEvent")
+local indexFrame = screenGui:WaitForChild("Index")
+local networkRemote = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Framework"):WaitForChild("Network"):WaitForChild("Remote"):WaitForChild("RemoteEvent")
 
+-- Your global config
+if not getgenv().Settings then
+    getgenv().Settings = {
+        WebhookURL = "https://discord.com/api/webhooks/1376881027112239155/nQtZhLMRAo3b1gOw9y0J2woPBmtF3sfyKdA6btPGsHPJ6yRq_jrUDMP3-zYVe8YSsWjp",
+        WebhookName = "Cat Index",
+        WebhookAvatarURL = "https://i.imgur.com/ur1iXmZ.png",
+
+        HatchAmount = 3,
+        HatchDelay = 2,
+        ExtraDelayEvery = 3,
+        ExtraDelaySeconds = 3,
+
+        TweenDuration = 1,
+        IndexButtonToggleDelay = 0.2,
+
+        EggOrder = {
+            "Common Egg", "Spotted Egg", "Iceshard Egg", "Spikey Egg",
+            "Magma Egg", "Crystal Egg", "Lunar Egg", "Void Egg",
+            "Hell Egg", "Nightmare Egg", "Rainbow Egg"
+        },
+
+        AutoDeleteRarities = { "Common", "Rare" }
+    }
+end
+
+-- Pet rarities table (FULL list)
 local PetRarities = {
     ["Doggy"] = "Common",
     ["Kitty"] = "Common",
@@ -168,163 +193,169 @@ local PetRarities = {
     ["Stone Gargoyle"] = "Legendary",
     ["Robo Kitty"] = "Common",
     ["Martian Kitty"] = "Unique",
-    ["Cyber Wolf"] = "Epic",
-    ["Cyborg Phoenix"] = "Legendary",
-    ["Space Invader"] = "Legendary",
-    ["Bionic Shard"] = "Legendary",
-    ["Mech Robot"] = "Secret",
-    ["Sleepy Bunny"] = "Rare",
-    ["Starry Lamb"] = "Epic",
-    ["Moon Deer"] = "Legendary",
-    ["Nebula"] = "Legendary",
-    ["Dusk"] = "Legendary",
-    ["Dawn"] = "Legendary",
-    ["Moonlight"] = "Legendary",
-    ["Luminosity"] = "Secret",
-    ["Magmas"] = "Legendary",
-    ["Dragon Plushie"] = "Legendary",
-    ["Dice Split"] = "Legendary",
-    ["Fancy Demon"] = "Rare",
-    ["Happy Dice"] = "Epic",
-    ["Game Master"] = "Legendary",
-    ["Jackpot"] = "Legendary",
-    ["Hell Demon"] = "Common",
-    ["Demon Angel"] = "Rare",
-    ["Crimson Butterfly"] = "Legendary",
-    ["Demonweb"] = "Legendary",
-    ["Crimson Bloodmoon"] = "Legendary",
-    ["Lord Shock"] = "Secret",
-    ["Cute Deer"] = "Common",
-    ["Emerald Wolf"] = "Rare",
-    ["Prismatic"] = "Legendary",
-    ["Darkness Creature"] = "Legendary",
-    ["Corrupt Glitch"] = "Legendary",
-    ["Wolflord"] = "Secret",
-    ["Sir Doggyton"] = "Legendary",
-    ["Vaporium"] = "Legendary",
-    ["D0GGY1337"] = "Secret",
-    ["Prophet"] = "Secret",
-    ["Queen Kitty"] = "Secret",
-    ["Toilet Doggy"] = "Legendary",
-    ["Capybara Plushie"] = "Legendary",
-    ["Neon Doggy"] = "Legendary",
-    ["Candy Kitty"] = "Legendary",
-    ["Starlight Kitty"] = "Legendary",
-    ["Electric Kitty"] = "Legendary",
-    ["Frosty Kitty"] = "Legendary",
-    ["Frosty Doggy"] = "Legendary",
-    ["Neon Bear"] = "Legendary",
-    ["Neon Bunny"] = "Legendary",
-    ["Neon Fox"] = "Legendary",
-    ["Neon Piggy"] = "Legendary",
-    ["Neon Deer"] = "Legendary",
-    ["Neon Golem"] = "Legendary",
-    ["Neon Panda"] = "Legendary",
-    ["Neon Kitty"] = "Legendary",
-    ["Neon Wolf"] = "Legendary",
-    ["Neon Dragon"] = "Legendary",
-    ["Neon Angel"] = "Legendary",
-    ["Neon Demon"] = "Legendary",
-    ["Neon Void"] = "Legendary",
-    ["Neon Hell"] = "Legendary",
+    ["Alien Kitty"] = "Rare",
+    ["Alien Dragon"] = "Epic",
+    ["Alien God"] = "Legendary",
+    ["Robo Bunny"] = "Common",
+    ["Robo Bunny Jr."] = "Unique",
+    ["The King"] = "Secret",
+    ["Rainbow Unicorn"] = "Legendary",
+    ["Minerals"] = "Common",
+    ["Mineral Bunny"] = "Unique",
+    ["Mineral Dragon"] = "Rare",
+    ["Mineral Phoenix"] = "Epic",
+    ["Mineral Hydra"] = "Legendary",
+    ["Steel Kitty"] = "Common",
+    ["Steel Bunny"] = "Unique",
+    ["Steel Dragon"] = "Rare",
+    ["Steel Phoenix"] = "Epic",
+    ["Steel Hydra"] = "Legendary",
+    ["Void Stone"] = "Common",
+    ["Void Bunny"] = "Unique",
+    ["Void Dragon"] = "Rare",
+    ["Void Phoenix"] = "Epic",
+    ["Void Hydra"] = "Legendary",
 }
 
--- Utility to get rarity for a pet name
-local function GetRarity(petName)
-    return PetRarities[petName] or "Unknown"
-end
-
--- Webhook send function
-local function SendWebhook(message)
-    if not getgenv().Settings.WebhookURL or getgenv().Settings.WebhookURL == "" then return end
-
-    local data = {
-        username = getgenv().Settings.WebhookName or "BGSI Auto Indexer",
-        avatar_url = getgenv().Settings.WebhookAvatarURL or "",
-        content = message
-    }
-
-    local encoded = HttpService:JSONEncode(data)
+-- Utility to send webhook messages
+local function sendWebhook(message)
     local success, err = pcall(function()
-        HttpService:PostAsync(getgenv().Settings.WebhookURL, encoded, Enum.HttpContentType.ApplicationJson)
+        local data = HttpService:JSONEncode({
+            username = getgenv().Settings.WebhookName or "Cat Index",
+            avatar_url = getgenv().Settings.WebhookAvatarURL or "https://i.imgur.com/ur1iXmZ.png",
+            content = message
+        })
+        local requestFunc = (syn and syn.request) or (http_request) or (request)
+        if requestFunc then
+            requestFunc({
+                Url = getgenv().Settings.WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = data
+            })
+        else
+            warn("No HTTP request function available for webhook")
+        end
     end)
     if not success then
-        warn("Webhook send failed: " .. tostring(err))
+        warn("Webhook failed:", err)
     end
 end
 
--- Index toggle functions
-local function OpenIndex()
-    if not indexFrame.Visible then
-        indexButton.MouseButton1Click:Fire()
-        wait(getgenv().Settings.TweenDuration or 1)
-    end
+-- Function to toggle autodelete for a pet and notify webhook
+local function toggleAutoDelete(petName, toggle)
+    if not petName then return end
+    networkRemote:FireServer("ToggleAutoDelete", petName)
+    sendWebhook("AutoDelete toggled **" .. (toggle and "ON" or "OFF") .. "** for pet: **" .. petName .. "** (rarity: " .. (PetRarities[petName] or "Unknown") .. ")")
 end
 
-local function CloseIndex()
-    if indexFrame.Visible then
-        indexButton.MouseButton1Click:Fire()
-        wait(getgenv().Settings.TweenDuration or 1)
-    end
-end
+-- Run autodelete for all pets of specified rarities
+local function runAutoDelete()
+    local settings = getgenv().Settings
+    if not settings or not settings.AutoDeleteRarities then return end
 
--- Keep Index Frame hidden forcibly (spam toggle visibility)
-coroutine.wrap(function()
-    while true do
-        indexFrame.Visible = false
-        wait(0.1)
-    end
-end)()
-
--- Example function to Auto-Delete pets by rarity after hatching
-local function AutoDeletePets()
-    -- This depends on your pet deletion RemoteEvent and method
-    -- Usually you find pets in your inventory, check their rarity, and send delete requests
-    -- Placeholder example:
-    for _, petModel in pairs(workspace.Pets:GetChildren()) do
-        local petName = petModel.Name
-        local rarity = GetRarity(petName)
-        if table.find(getgenv().Settings.AutoDeleteRarities, rarity) then
-            -- Fire remote to delete pet (example event name)
-            if NetworkRemote then
-                NetworkRemote:FireServer("DeletePet", petModel)
-                print("Deleted pet:", petName, "rarity:", rarity)
+    for petName, rarity in pairs(PetRarities) do
+        for _, delRarity in ipairs(settings.AutoDeleteRarities) do
+            if rarity == delRarity then
+                toggleAutoDelete(petName, true)
+                task.wait(0.2)
+                break
             end
         end
     end
 end
 
--- Hatch eggs logic (simplified)
-local function HatchEgg(eggName)
+-- Opens the index for a given egg and waits for it to open
+local function openIndex(eggName)
+    if not eggName then return false end
+    local openButton = indexFrame:FindFirstChild(eggName)
+    if not openButton then return false end
+
+    openButton.MouseButton1Click:Fire()
+    task.wait(getgenv().Settings.IndexButtonToggleDelay or 0.2)
+
+    -- Wait for the egg's index page to be visible (you might have to adjust the path)
+    local eggIndexFrame = indexFrame:FindFirstChild(eggName .. "Index")
+    if not eggIndexFrame then return false end
+
+    -- Tween in for smoothness (optional)
+    TweenService:Create(eggIndexFrame, TweenInfo.new(getgenv().Settings.TweenDuration or 1), {Position = UDim2.new(0, 0, 0, 0)}):Play()
+    task.wait(getgenv().Settings.TweenDuration or 1)
+    return true
+end
+
+-- Closes the index for a given egg
+local function closeIndex(eggName)
     if not eggName then return end
-    print("Hatching egg:", eggName)
-
-    -- Fire remote to hatch egg (example)
-    if NetworkRemote then
-        NetworkRemote:FireServer("HatchEgg", eggName, getgenv().Settings.HatchAmount)
-        SendWebhook("Hatching " .. tostring(getgenv().Settings.HatchAmount) .. " x " .. eggName)
+    local closeButton = indexFrame:FindFirstChild(eggName)
+    if closeButton then
+        closeButton.MouseButton1Click:Fire()
+        task.wait(getgenv().Settings.IndexButtonToggleDelay or 0.2)
     end
-
-    wait(getgenv().Settings.HatchDelay or 2)
 end
 
--- Main loop example (goes through eggs, hatches, auto deletes)
-coroutine.wrap(function()
-    while true do
-        for i, eggName in ipairs(getgenv().Settings.EggOrder) do
-            OpenIndex()
+-- Check if pet is missing on the index egg page
+local function isPetMissing(eggName, petName)
+    local eggIndexFrame = indexFrame:FindFirstChild(eggName .. "Index")
+    if not eggIndexFrame then return true end
 
-            HatchEgg(eggName)
+    local petLabel = eggIndexFrame:FindFirstChild(petName)
+    if not petLabel then return true end
 
-            AutoDeletePets()
+    -- If label visible = pet obtained, else missing
+    return not petLabel.Visible
+end
 
-            CloseIndex()
+-- Main hatch function
+local function hatchEgg(eggName, amount)
+    for i = 1, amount do
+        networkRemote:FireServer("BuyEgg", eggName, false) -- false = normal hatch, true=auto hatch? Adjust if needed
+        sendWebhook("Hatched **".. eggName .."** (egg #" .. i .. "/" .. amount .. ")")
+        task.wait(getgenv().Settings.HatchDelay or 2)
 
-            -- Extra delay every X hatches
-            if i % (getgenv().Settings.ExtraDelayEvery or 3) == 0 then
-                wait(getgenv().Settings.ExtraDelaySeconds or 3)
-            end
+        -- Every ExtraDelayEvery hatches, wait ExtraDelaySeconds
+        if i % (getgenv().Settings.ExtraDelayEvery or 3) == 0 then
+            task.wait(getgenv().Settings.ExtraDelaySeconds or 3)
         end
-        wait(5) -- Delay before next full cycle
     end
-end)()
+end
+
+-- Main indexer logic
+local function runIndex()
+    runAutoDelete()
+
+    for _, eggName in ipairs(getgenv().Settings.EggOrder) do
+        if openIndex(eggName) then
+            -- Loop through all pets in this egg rarity and check missing
+            local missingPets = {}
+
+            for petName, rarity in pairs(PetRarities) do
+                -- Simplify: We assume pet belongs to egg if petName contains eggName (or you can have a mapping)
+                -- For real BGSI, mapping is more complex, so here simplified:
+                if petName:find(eggName:gsub(" Egg", "")) then
+                    if isPetMissing(eggName, petName) then
+                        table.insert(missingPets, petName)
+                    end
+                end
+            end
+
+            -- Send webhook if any missing pets for this egg
+            if #missingPets > 0 then
+                sendWebhook("Missing pets in egg **".. eggName .."**: ".. table.concat(missingPets, ", "))
+            end
+
+            -- Hatch missing pets
+            hatchEgg(eggName, getgenv().Settings.HatchAmount or 3)
+
+            closeIndex(eggName)
+            task.wait(1)
+        else
+            warn("Failed to open index for egg:", eggName)
+        end
+    end
+
+    sendWebhook("Indexing complete.")
+end
+
+-- Run main
+runIndex()
